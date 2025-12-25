@@ -52,28 +52,18 @@ jobs:
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/oem_trace/Makefile
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/param_read_write/Makefile
 
-        # --- 6. Enable KSU in Defconfig ---
-        echo "CONFIG_KSU=y" >> arch/arm64/configs/enchilada_defconfig
-        echo "CONFIG_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
-        echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
-        echo "CONFIG_KPROBE_EVENTS=y" >> arch/arm64/configs/enchilada_defconfig
-        
-        # --- 7. FIX: Recursively Disable Warnings as Errors ---
+        # --- 6. FIX: Recursively Disable Warnings as Errors ---
         find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
         echo "KBUILD_CFLAGS += -Wno-error" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-sizeof-pointer-memaccess" >> Makefile
         sed -i 's/-implicit-function-declaration/-Wimplicit-function-declaration/g' Makefile
 
-        # --- 8. FIX: LINKER ERRORS (THE FINAL BOSS) ---
+        # --- 7. FIX: LINKER ERRORS (Nuke & Stub) ---
         
-        # A. Force KernelSU to compile
-        echo "obj-y += kernelsu/" >> drivers/Makefile
-        
-        # B. Nuke oem_force_dump (Robust Method with 'find')
-        # Instead of guessing the path, we find the file and empty it.
+        # Nuke oem_force_dump (Robust Method with 'find')
         find drivers -name "oem_force_dump.c" -exec sh -c 'echo "// Nuked by GitHub Actions" > {}' \;
         
-        # C. Create Dummy Functions (Stubs) for missing symbols
+        # Create Dummy Functions (Stubs) for missing symbols
         cat >> init/main.c <<EOF
         
         /* DUMMY FUNCTIONS FOR LINKER FIXES */
@@ -97,9 +87,21 @@ jobs:
         
         make clean && make mrproper
         
+        # 1. Generate default config
         make O=out enchilada_defconfig
         
-        # --- CRITICAL CONFIG FIXES ---
+        # --- CRITICAL CONFIG FIXES (Applied AFTER generation) ---
+        
+        # A. Force KSU Config directly into the generated .config
+        echo "CONFIG_KSU=y" >> out/.config
+        echo "CONFIG_KPROBES=y" >> out/.config
+        echo "CONFIG_HAVE_KPROBES=y" >> out/.config
+        echo "CONFIG_KPROBE_EVENTS=y" >> out/.config
+        
+        # B. Force KSU compilation in Makefile (with newline safety)
+        echo -e "\nobj-y += kernelsu/" >> drivers/Makefile
+        
+        # C. Other Config Fixes
         sed -i 's/CONFIG_NR_CPUS=[0-9]*/CONFIG_NR_CPUS=8/' out/.config
         echo "CONFIG_NO_HZ_COMMON=y" >> out/.config
         echo "CONFIG_NO_HZ_IDLE=y" >> out/.config
@@ -108,6 +110,7 @@ jobs:
         echo "CONFIG_STACKTRACE_SUPPORT=y" >> out/.config
         # --- END FIXES ---
         
+        # 2. Start Build
         make O=out -j$(nproc --all) Image.gz-dtb
 
     - name: Package with AnyKernel3
