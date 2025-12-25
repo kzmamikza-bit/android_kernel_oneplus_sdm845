@@ -48,7 +48,6 @@ jobs:
         
         # --- 5. FIX: OnePlus Drivers Compilation Errors ---
         sed -i '1i #include <linux/stacktrace.h>' drivers/oneplus/drivers/oem_trace/oem_trace.c
-        # Force silence in problematic folders
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/oem_trace/Makefile
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/param_read_write/Makefile
 
@@ -59,13 +58,9 @@ jobs:
         sed -i 's/-implicit-function-declaration/-Wimplicit-function-declaration/g' Makefile
 
         # --- 7. FIX: LINKER ERRORS (Nuke & Stub) ---
-        
-        # Nuke oem_force_dump (Robust Method with 'find')
         find drivers -name "oem_force_dump.c" -exec sh -c 'echo "// Nuked by GitHub Actions" > {}' \;
         
-        # Create Dummy Functions (Stubs) for missing symbols
         cat >> init/main.c <<EOF
-        
         /* DUMMY FUNCTIONS FOR LINKER FIXES */
         void rpmhstats_statistics(void) {}
         void unfreezer_fork(void) {}
@@ -87,30 +82,41 @@ jobs:
         
         make clean && make mrproper
         
-        # 1. Generate default config
+        # --- SMART CONFIG DETECTION ---
+        echo "Searching for Config file..."
+        if [ -f "arch/arm64/configs/sdm845_defconfig" ]; then
+            echo "Found sdm845_defconfig! Using it as base."
+            cp arch/arm64/configs/sdm845_defconfig arch/arm64/configs/enchilada_defconfig
+        elif [ -f "arch/arm64/configs/oneplus6_defconfig" ]; then
+             echo "Found oneplus6_defconfig! Using it as base."
+             cp arch/arm64/configs/oneplus6_defconfig arch/arm64/configs/enchilada_defconfig
+        else
+             echo "Config not found! Listing available configs:"
+             ls arch/arm64/configs/
+        fi
+        
+        # --- INJECT KERNELSU INTO CONFIG ---
+        echo "CONFIG_KSU=y" >> arch/arm64/configs/enchilada_defconfig
+        echo "CONFIG_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
+        echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
+        echo "CONFIG_KPROBE_EVENTS=y" >> arch/arm64/configs/enchilada_defconfig
+        
+        # Generate config
         make O=out enchilada_defconfig
         
-        # --- CRITICAL CONFIG FIXES (Applied AFTER generation) ---
-        
-        # A. Force KSU Config directly into the generated .config
-        echo "CONFIG_KSU=y" >> out/.config
-        echo "CONFIG_KPROBES=y" >> out/.config
-        echo "CONFIG_HAVE_KPROBES=y" >> out/.config
-        echo "CONFIG_KPROBE_EVENTS=y" >> out/.config
-        
-        # B. Force KSU compilation in Makefile (with newline safety)
-        echo -e "\nobj-y += kernelsu/" >> drivers/Makefile
-        
-        # C. Other Config Fixes
+        # --- CRITICAL CONFIG FIXES (Post-Generation) ---
         sed -i 's/CONFIG_NR_CPUS=[0-9]*/CONFIG_NR_CPUS=8/' out/.config
         echo "CONFIG_NO_HZ_COMMON=y" >> out/.config
         echo "CONFIG_NO_HZ_IDLE=y" >> out/.config
         echo "CONFIG_NO_HZ=y" >> out/.config
         echo "CONFIG_STACKTRACE=y" >> out/.config
         echo "CONFIG_STACKTRACE_SUPPORT=y" >> out/.config
+        
+        # Force KSU compilation in Makefile
+        echo -e "\nobj-y += kernelsu/" >> drivers/Makefile
         # --- END FIXES ---
         
-        # 2. Start Build
+        # Start Build
         make O=out -j$(nproc --all) Image.gz-dtb
 
     - name: Package with AnyKernel3
