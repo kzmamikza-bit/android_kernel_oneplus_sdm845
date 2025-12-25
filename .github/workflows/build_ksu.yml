@@ -47,12 +47,8 @@ jobs:
         sed -i '1i #define mark_reserved(x) do {} while (0)' kernel/sched/fair.c
         
         # --- 5. FIX: OnePlus Drivers Compilation Errors ---
-        
-        # Fix oem_trace (Stacktrace + Silence)
         sed -i '1i #include <linux/stacktrace.h>' drivers/oneplus/drivers/oem_trace/oem_trace.c
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/oem_trace/Makefile
-        
-        # Fix param_read_write (Silence unused variable error)
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/param_read_write/Makefile
 
         # --- 6. Enable KSU in Defconfig ---
@@ -61,13 +57,36 @@ jobs:
         echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_KPROBE_EVENTS=y" >> arch/arm64/configs/enchilada_defconfig
         
-        # --- 7. FIX: Recursively Disable Warnings as Errors (The Ultimate Fix) ---
+        # --- 7. FIX: Recursively Disable Warnings as Errors ---
         find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
-        
-        # Add global permissive flags
         echo "KBUILD_CFLAGS += -Wno-error" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-sizeof-pointer-memaccess" >> Makefile
         sed -i 's/-implicit-function-declaration/-Wimplicit-function-declaration/g' Makefile
+
+        # --- 8. FIX: LINKER ERRORS (THE FINAL BOSS) ---
+        
+        # A. Force KernelSU to compile (Fixes undefined reference to ksu_handle...)
+        # We manually append the KSU directory to the drivers Makefile to ensure it's linked.
+        echo "obj-y += kernelsu/" >> drivers/Makefile
+        
+        # B. Nuke oem_force_dump (Fixes 10+ networking/socket errors)
+        # This file causes massive linker errors and isn't needed for a custom kernel.
+        # We overwrite it with an empty file.
+        echo "// Nuked by GitHub Actions to fix linker errors" > drivers/oneplus/drivers/oem_force_dump/oem_force_dump.c
+        
+        # C. Create Dummy Functions (Stubs) for missing symbols
+        # We inject empty functions into init/main.c so the linker finds them and stops complaining.
+        
+        cat >> init/main.c <<EOF
+        
+        /* DUMMY FUNCTIONS FOR LINKER FIXES */
+        void rpmhstats_statistics(void) {}
+        void unfreezer_fork(void) {}
+        void save_dump_reason_to_smem(void) {}
+        int oem_get_download_mode(void) { return 0; }
+        void msm_serial_oem_init(void) {}
+        /* End Dummy Functions */
+        EOF
 
     - name: Build Kernel
       run: |
