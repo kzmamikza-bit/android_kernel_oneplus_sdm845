@@ -38,13 +38,15 @@ jobs:
         sed -i '/struct filename \*tmp;/a extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n\tif (ksu_handle_faccessat(&dfd, &filename, (int *)&mode, NULL)) return 0;' fs/open.c
 
         # --- 3. CLEANUP: Removed conflicting manual definitions ---
-        # We removed the fixes for kernel/power/main.c and kernel/sched/fair.c
-        # because the Smart Config now loads the real definitions correctly.
         
         # --- 4. FIX: OnePlus Drivers Compilation Errors ---
         sed -i '1i #include <linux/stacktrace.h>' drivers/oneplus/drivers/oem_trace/oem_trace.c
+        # Force silence in problematic folders
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/oem_trace/Makefile
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/param_read_write/Makefile
+        
+        # FIX: Synaptics Touchscreen Warning
+        echo "ccflags-y += -w" >> drivers/input/touchscreen/Makefile
 
         # --- 5. FIX: Recursively Disable Warnings as Errors ---
         find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
@@ -64,6 +66,12 @@ jobs:
         void msm_serial_oem_init(void) {}
         /* End Dummy Functions */
         EOF
+        
+        # --- 7. FIX: Device Tree (DTC) Errors ---
+        # The sdm845-cdp board is broken in this source, we remove it from the build list.
+        # We assume the file is arch/arm64/boot/dts/qcom/Makefile
+        sed -i 's/sdm845-cdp.dtb//g' arch/arm64/boot/dts/qcom/Makefile
+        sed -i 's/sdm845-cdp-overlay.dtb//g' arch/arm64/boot/dts/qcom/Makefile
 
     - name: Build Kernel
       run: |
@@ -107,8 +115,9 @@ jobs:
         echo "CONFIG_STACKTRACE=y" >> out/.config
         echo "CONFIG_STACKTRACE_SUPPORT=y" >> out/.config
         
-        # Force KSU compilation in Makefile
+        # Force KSU compilation & Silence Warnings
         echo -e "\nobj-y += kernelsu/" >> drivers/Makefile
+        echo "ccflags-y += -w" >> drivers/kernelsu/Makefile
         # --- END FIXES ---
         
         # Start Build
