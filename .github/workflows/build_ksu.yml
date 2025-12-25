@@ -28,19 +28,18 @@ jobs:
         # --- 1. KernelSU Setup ---
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
 
-        # --- 2. Apply Manual Hooks for Kernel 4.9 (PRECISION MODE) ---
+        # --- 2. Apply Manual Hooks for Kernel 4.9 (NUCLEAR MODE) ---
         
         # FIX fs/exec.c
-        # 1. Declare the function manually at the top (Nuclear fix for implicit declaration)
-        # We use void* for argv/envp to avoid struct type issues in the prototype
-        sed -i '1i extern int ksu_handle_execveat(int *fd, struct filename **filename_user, void *argv, void *envp, int *flags);' fs/exec.c
+        # We use (void *) for ALL pointer arguments to completely bypass type checking and struct visibility issues.
+        sed -i '1i extern int ksu_handle_execveat(int *fd, void *filename_user, void *argv, void *envp, int *flags);' fs/exec.c
         
-        # 2. Insert the hook ONLY inside do_execveat_common
-        # We target "bprm = kzalloc..." because this line is unique to the correct function.
-        # We insert BEFORE this line. We cast arguments to (void*) to match our manual declaration.
-        sed -i '/bprm = kzalloc/i \\tif (ksu_handle_execveat(&fd, &filename, (void *)&argv, (void *)&envp, &flags)) return 0;' fs/exec.c
+        # Insert hook in do_execveat_common (before 'bprm = kzalloc')
+        # We cast &filename to (void *) to match our blind prototype.
+        sed -i '/bprm = kzalloc/i \\tif (ksu_handle_execveat(&fd, (void *)&filename, (void *)&argv, (void *)&envp, &flags)) return 0;' fs/exec.c
         
-        # FIX fs/open.c (Keeping the working fix from V8)
+        # FIX fs/open.c
+        # Keeping the working "Nuclear" fix from before
         sed -i '/struct filename \*tmp;/a extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n\tif (ksu_handle_faccessat(&dfd, &filename, (int *)&mode, NULL)) return 0;' fs/open.c
 
         # --- 3. FIX: Define missing OnePlus CPU constants ---
