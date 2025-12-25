@@ -37,11 +37,8 @@ jobs:
         # FIX fs/open.c
         sed -i '/struct filename \*tmp;/a extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n\tif (ksu_handle_faccessat(&dfd, &filename, (int *)&mode, NULL)) return 0;' fs/open.c
 
-        # --- 3. FIX: Define missing OnePlus CPU constants ---
-        sed -i '1i #define LITTLE_CLUSTER_CPU_NUMBER 0' kernel/power/main.c
-        sed -i '1i #define BIG_CLUSTER_CPU_NUMBER 4' kernel/power/main.c
-        sed -i '1i #define RESUME_BOOST_LITTLE_CPU_QOS_FREQ 300000' kernel/power/main.c
-        sed -i '1i #define RESUME_BOOST_BIG_CPU_QOS_FREQ 825600' kernel/power/main.c
+        # --- 3. REMOVED: kernel/power/main.c fixes ---
+        # (We deleted the conflicting manual definitions here because Smart Config found the real ones)
 
         # --- 4. FIX: Define mark_reserved for sched/fair.c ---
         sed -i '1i #define mark_reserved(x) do {} while (0)' kernel/sched/fair.c
