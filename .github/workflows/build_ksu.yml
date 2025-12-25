@@ -13,31 +13,32 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        # 1. تثبيت Python 2 ومترجمات GCC الضرورية
-        sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python2 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+        # Installing dependencies. Replaced gcc-multilib with libc6-dev-i386 to avoid conflicts with cross-compilers
+        sudo apt-get install -y bc bison build-essential ccache curl flex git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python2 libc6-dev-i386 lib32ncurses6 lib32tinfo6 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
 
-        # 2. (هام جداً) إجبار النظام على استخدام Python 2
-        # لأن الكيرنل القديم لا يفهم Python 3
+        # Force system to use Python 2 for legacy kernel scripts
         sudo ln -sf /usr/bin/python2 /usr/bin/python
 
     - name: Setup LineageOS Clang
       run: |
-        # استخدام Clang 12 الرسمي من LineageOS
+        # Clone LineageOS Clang 12 (Stable for Android 11 / Kernel 4.9)
         git clone --depth=1 https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b toolchain
 
     - name: Setup KernelSU and Patch 4.9
       run: |
-        # Download KSU setup script
+        # 1. Download KSU setup script
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
 
-        # Apply Manual Hooks for Kernel 4.9
+        # 2. Apply Manual Hooks for Kernel 4.9 (Critical for OP6)
+        # Patching fs/exec.c
         sed -i '/#include <linux\/fs.h>/a #include "../drivers/kernelsu/ksu.h"' fs/exec.c
         sed -i '/return retval;/i \\tif (ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags)) return 0;' fs/exec.c
         
+        # Patching fs/open.c
         sed -i '/long do_sys_open/i #include "../drivers/kernelsu/ksu.h"' fs/open.c
         sed -i '/return do_sys_open/i \\tif (ksu_handle_faccessat(&dfd, &filename, &mode, NULL)) return 0;' fs/open.c
 
-        # Enable KSU in Defconfig
+        # 3. Enable KSU in Defconfig
         echo "CONFIG_KSU=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
@@ -48,11 +49,9 @@ jobs:
         export PATH=$GITHUB_WORKSPACE/toolchain/bin:$PATH
         export ARCH=arm64
         export SUBARCH=arm64
-        # تحديد المترجمات بدقة
         export CROSS_COMPILE=aarch64-linux-gnu-
         export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
         export CC=clang
-        # تحديد Linker ليكون LLD (أسرع وأفضل مع Clang)
         export LD=ld.lld
         
         # Clean build
@@ -69,6 +68,7 @@ jobs:
         git clone https://github.com/osm0sis/AnyKernel3
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
         cd AnyKernel3
+        # Disable device check
         sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
         zip -r9 kernel-ksu-op6.zip *
 
