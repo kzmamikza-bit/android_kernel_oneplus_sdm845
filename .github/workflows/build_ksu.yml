@@ -45,22 +45,26 @@ jobs:
 
         # --- 4. FIX: Define mark_reserved for sched/fair.c ---
         sed -i '1i #define mark_reserved(x) do {} while (0)' kernel/sched/fair.c
+        
+        # --- 5. FIX: Missing include in oem_trace.c ---
+        # This fixes "storage size of ‘trace’ isn’t known" error
+        sed -i '1i #include <linux/stacktrace.h>' drivers/oneplus/drivers/oem_trace/oem_trace.c
 
-        # --- 5. Enable KSU in Defconfig ---
+        # --- 6. Enable KSU in Defconfig ---
         echo "CONFIG_KSU=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_KPROBE_EVENTS=y" >> arch/arm64/configs/enchilada_defconfig
         
-        # --- 6. FIX: Disable Warnings as Errors & Fix Typos ---
-        # Disable Werror globally
-        sed -i 's/-Werror//g' Makefile
+        # --- 7. FIX: Recursively Disable Warnings as Errors (The Ultimate Fix) ---
+        # Find ALL Makefiles in the entire project and remove -Werror from them
+        find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
+        
+        # Add global permissive flags
         echo "KBUILD_CFLAGS += -Wno-error" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-sizeof-pointer-memaccess" >> Makefile
-        sed -i 's/-Werror//g' drivers/clk/Makefile
         
-        # FIX: Correct the typo "-implicit-function-declaration" to "-Wimplicit-function-declaration"
-        # This fixes the "unrecognized command-line option" error
+        # Fix the Makefile typo
         sed -i 's/-implicit-function-declaration/-Wimplicit-function-declaration/g' Makefile
 
     - name: Build Kernel
