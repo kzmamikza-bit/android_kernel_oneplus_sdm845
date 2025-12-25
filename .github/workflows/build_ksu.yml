@@ -48,6 +48,7 @@ jobs:
         
         # --- 5. FIX: OnePlus Drivers Compilation Errors ---
         sed -i '1i #include <linux/stacktrace.h>' drivers/oneplus/drivers/oem_trace/oem_trace.c
+        # Force silence in problematic folders
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/oem_trace/Makefile
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/param_read_write/Makefile
 
@@ -65,18 +66,14 @@ jobs:
 
         # --- 8. FIX: LINKER ERRORS (THE FINAL BOSS) ---
         
-        # A. Force KernelSU to compile (Fixes undefined reference to ksu_handle...)
-        # We manually append the KSU directory to the drivers Makefile to ensure it's linked.
+        # A. Force KernelSU to compile
         echo "obj-y += kernelsu/" >> drivers/Makefile
         
-        # B. Nuke oem_force_dump (Fixes 10+ networking/socket errors)
-        # This file causes massive linker errors and isn't needed for a custom kernel.
-        # We overwrite it with an empty file.
-        echo "// Nuked by GitHub Actions to fix linker errors" > drivers/oneplus/drivers/oem_force_dump/oem_force_dump.c
+        # B. Nuke oem_force_dump (Robust Method with 'find')
+        # Instead of guessing the path, we find the file and empty it.
+        find drivers -name "oem_force_dump.c" -exec sh -c 'echo "// Nuked by GitHub Actions" > {}' \;
         
         # C. Create Dummy Functions (Stubs) for missing symbols
-        # We inject empty functions into init/main.c so the linker finds them and stops complaining.
-        
         cat >> init/main.c <<EOF
         
         /* DUMMY FUNCTIONS FOR LINKER FIXES */
