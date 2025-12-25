@@ -13,7 +13,7 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        # Installing dependencies. Using libc6-dev-i386 to fix gcc-multilib conflict
+        # Install dependencies. Using libc6-dev-i386 to fix gcc-multilib conflict
         sudo apt-get install -y bc bison build-essential ccache curl flex git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python2 libc6-dev-i386 lib32ncurses6 lib32tinfo6 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
 
         # Force system to use Python 2
@@ -30,11 +30,16 @@ jobs:
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
 
         # --- 2. Apply Manual Hooks for Kernel 4.9 ---
+        
+        # FIX fs/exec.c
         sed -i '/#include <linux\/fs.h>/a #include "../drivers/kernelsu/ksu.h"' fs/exec.c
         sed -i '/return retval;/i \\tif (ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags)) return 0;' fs/exec.c
         
+        # FIX fs/open.c (CORRECTED)
+        # We add the include header
         sed -i '/long do_sys_open/i #include "../drivers/kernelsu/ksu.h"' fs/open.c
-        sed -i '/return do_sys_open/i \\tif (ksu_handle_faccessat(&dfd, &filename, &mode, NULL)) return 0;' fs/open.c
+        # We insert the hook BEFORE 'build_open_flags' to ensure we are inside the function where 'dfd' exists
+        sed -i '/int fd = build_open_flags/i \\tif (ksu_handle_faccessat(&dfd, &filename, &mode, NULL)) return 0;' fs/open.c
 
         # --- 3. FIX: Define missing OnePlus CPU constants ---
         sed -i '1i #define LITTLE_CLUSTER_CPU_NUMBER 0' kernel/power/main.c
@@ -42,8 +47,7 @@ jobs:
         sed -i '1i #define RESUME_BOOST_LITTLE_CPU_QOS_FREQ 300000' kernel/power/main.c
         sed -i '1i #define RESUME_BOOST_BIG_CPU_QOS_FREQ 825600' kernel/power/main.c
 
-        # --- 4. FIX: Define mark_reserved to fix sched/fair.c error ---
-        # We add a dummy macro so the compiler ignores this missing function
+        # --- 4. FIX: Define mark_reserved for sched/fair.c ---
         sed -i '1i #define mark_reserved(x) do {} while (0)' kernel/sched/fair.c
 
         # --- 5. Enable KSU in Defconfig ---
