@@ -36,8 +36,7 @@ jobs:
         sed -i '/long do_sys_open/i #include "../drivers/kernelsu/ksu.h"' fs/open.c
         sed -i '/return do_sys_open/i \\tif (ksu_handle_faccessat(&dfd, &filename, &mode, NULL)) return 0;' fs/open.c
 
-        # --- 3. FIX: Define missing OnePlus CPU constants in kernel/power/main.c ---
-        # We inject these defines at the top of the file to resolve "undeclared" errors
+        # --- 3. FIX: Define missing OnePlus CPU constants ---
         sed -i '1i #define LITTLE_CLUSTER_CPU_NUMBER 0' kernel/power/main.c
         sed -i '1i #define BIG_CLUSTER_CPU_NUMBER 4' kernel/power/main.c
         sed -i '1i #define RESUME_BOOST_LITTLE_CPU_QOS_FREQ 300000' kernel/power/main.c
@@ -64,8 +63,18 @@ jobs:
         # Generate config
         make O=out enchilada_defconfig
         
-        # FIX: Force NR_CPUS to 8 to avoid tracing errors
+        # --- CRITICAL FIXES START ---
+        
+        # Fix 1: Force NR_CPUS to 8
         sed -i 's/CONFIG_NR_CPUS=[0-9]*/CONFIG_NR_CPUS=8/' out/.config
+        
+        # Fix 2: Enable NOHZ (Tickless) to fix "undeclared NOHZ_BALANCE_KICK" error
+        # We manually enable these flags in the config file
+        echo "CONFIG_NO_HZ_COMMON=y" >> out/.config
+        echo "CONFIG_NO_HZ_IDLE=y" >> out/.config
+        echo "CONFIG_NO_HZ=y" >> out/.config
+        
+        # --- CRITICAL FIXES END ---
         
         # Start Build
         make O=out -j$(nproc --all) Image.gz-dtb
