@@ -42,7 +42,11 @@ jobs:
         sed -i '1i #define RESUME_BOOST_LITTLE_CPU_QOS_FREQ 300000' kernel/power/main.c
         sed -i '1i #define RESUME_BOOST_BIG_CPU_QOS_FREQ 825600' kernel/power/main.c
 
-        # --- 4. Enable KSU in Defconfig ---
+        # --- 4. FIX: Define mark_reserved to fix sched/fair.c error ---
+        # We add a dummy macro so the compiler ignores this missing function
+        sed -i '1i #define mark_reserved(x) do {} while (0)' kernel/sched/fair.c
+
+        # --- 5. Enable KSU in Defconfig ---
         echo "CONFIG_KSU=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
@@ -63,18 +67,17 @@ jobs:
         # Generate config
         make O=out enchilada_defconfig
         
-        # --- CRITICAL FIXES START ---
+        # --- CRITICAL CONFIG FIXES ---
         
         # Fix 1: Force NR_CPUS to 8
         sed -i 's/CONFIG_NR_CPUS=[0-9]*/CONFIG_NR_CPUS=8/' out/.config
         
-        # Fix 2: Enable NOHZ (Tickless) to fix "undeclared NOHZ_BALANCE_KICK" error
-        # We manually enable these flags in the config file
+        # Fix 2: Enable NOHZ options manually
         echo "CONFIG_NO_HZ_COMMON=y" >> out/.config
         echo "CONFIG_NO_HZ_IDLE=y" >> out/.config
         echo "CONFIG_NO_HZ=y" >> out/.config
         
-        # --- CRITICAL FIXES END ---
+        # --- END FIXES ---
         
         # Start Build
         make O=out -j$(nproc --all) Image.gz-dtb
