@@ -17,7 +17,7 @@ jobs:
 
     - name: Setup Proton Clang 13
       run: |
-        git clone --depth=1 https://github.com/Gengkapak/proton-clang -b clang-13 toolchain
+        git clone --depth=1 https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b toolchain
 
     - name: Setup KernelSU and Patch 4.9
       run: |
