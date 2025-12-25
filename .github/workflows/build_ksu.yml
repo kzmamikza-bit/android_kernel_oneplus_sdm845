@@ -44,7 +44,6 @@ jobs:
         # Force silence in problematic folders
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/oem_trace/Makefile
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/param_read_write/Makefile
-        
         # FIX: Synaptics Touchscreen Warning
         echo "ccflags-y += -w" >> drivers/input/touchscreen/Makefile
 
@@ -68,10 +67,15 @@ jobs:
         EOF
         
         # --- 7. FIX: Device Tree (DTC) Errors ---
-        # The sdm845-cdp board is broken in this source, we remove it from the build list.
-        # We assume the file is arch/arm64/boot/dts/qcom/Makefile
+        # We remove ALL "cdp" board references to be safe (v1, v2, etc.)
         sed -i 's/sdm845-cdp.dtb//g' arch/arm64/boot/dts/qcom/Makefile
+        sed -i 's/sdm845-v2-cdp.dtb//g' arch/arm64/boot/dts/qcom/Makefile
         sed -i 's/sdm845-cdp-overlay.dtb//g' arch/arm64/boot/dts/qcom/Makefile
+        
+        # --- 8. FIX: KernelSU Compatibility with Old Kernel (4.9) ---
+        # KernelSU expects <linux/compiler_types.h> which is new.
+        # We create a fake one that points to the old <linux/compiler.h>
+        echo '#include <linux/compiler.h>' > include/linux/compiler_types.h
 
     - name: Build Kernel
       run: |
