@@ -37,24 +37,22 @@ jobs:
         # FIX fs/open.c
         sed -i '/struct filename \*tmp;/a extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n\tif (ksu_handle_faccessat(&dfd, &filename, (int *)&mode, NULL)) return 0;' fs/open.c
 
-        # --- 3. REMOVED: kernel/power/main.c fixes ---
-        # (We deleted the conflicting manual definitions here because Smart Config found the real ones)
-
-        # --- 4. FIX: Define mark_reserved for sched/fair.c ---
-        sed -i '1i #define mark_reserved(x) do {} while (0)' kernel/sched/fair.c
+        # --- 3. CLEANUP: Removed conflicting manual definitions ---
+        # We removed the fixes for kernel/power/main.c and kernel/sched/fair.c
+        # because the Smart Config now loads the real definitions correctly.
         
-        # --- 5. FIX: OnePlus Drivers Compilation Errors ---
+        # --- 4. FIX: OnePlus Drivers Compilation Errors ---
         sed -i '1i #include <linux/stacktrace.h>' drivers/oneplus/drivers/oem_trace/oem_trace.c
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/oem_trace/Makefile
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/param_read_write/Makefile
 
-        # --- 6. FIX: Recursively Disable Warnings as Errors ---
+        # --- 5. FIX: Recursively Disable Warnings as Errors ---
         find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
         echo "KBUILD_CFLAGS += -Wno-error" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-sizeof-pointer-memaccess" >> Makefile
         sed -i 's/-implicit-function-declaration/-Wimplicit-function-declaration/g' Makefile
 
-        # --- 7. FIX: LINKER ERRORS (Nuke & Stub) ---
+        # --- 6. FIX: LINKER ERRORS (Nuke & Stub) ---
         find drivers -name "oem_force_dump.c" -exec sh -c 'echo "// Nuked by GitHub Actions" > {}' \;
         
         cat >> init/main.c <<EOF
