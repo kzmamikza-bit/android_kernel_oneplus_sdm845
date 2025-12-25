@@ -30,16 +30,14 @@ jobs:
 
         # --- 2. Apply Manual Hooks for Kernel 4.9 ---
         
-        # FIX fs/exec.c (This part was working fine)
+        # FIX fs/exec.c
         sed -i '1i #include "../drivers/kernelsu/ksu.h"' fs/exec.c
         sed -i '/return retval;/i \\tif (ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags)) return 0;' fs/exec.c
         
-        # FIX fs/open.c (THE NUCLEAR FIX)
-        # Instead of just including the header, we manually declare the function prototype (extern int...)
-        # This forces the compiler to recognize the function, bypassing the "implicit declaration" error completely.
-        # We insert this definition AND the hook logic after "struct filename *tmp;" to satisfy C90 rules.
+        # FIX fs/open.c (TYPE CAST FIX)
+        # We define the prototype manually AND we cast (int *)&mode to silence the incompatible pointer type error.
         
-        sed -i '/struct filename \*tmp;/a extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n\tif (ksu_handle_faccessat(&dfd, &filename, &mode, NULL)) return 0;' fs/open.c
+        sed -i '/struct filename \*tmp;/a extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n\tif (ksu_handle_faccessat(&dfd, &filename, (int *)&mode, NULL)) return 0;' fs/open.c
 
         # --- 3. FIX: Define missing OnePlus CPU constants ---
         sed -i '1i #define LITTLE_CLUSTER_CPU_NUMBER 0' kernel/power/main.c
