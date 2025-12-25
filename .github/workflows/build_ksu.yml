@@ -52,13 +52,16 @@ jobs:
         echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_KPROBE_EVENTS=y" >> arch/arm64/configs/enchilada_defconfig
         
-        # --- 6. FIX: Disable Warnings as Errors (The Global Fix) ---
-        # This prevents the build from stopping on "forbidden warning" like the one in clk.c
+        # --- 6. FIX: Disable Warnings as Errors & Fix Typos ---
+        # Disable Werror globally
         sed -i 's/-Werror//g' Makefile
         echo "KBUILD_CFLAGS += -Wno-error" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-sizeof-pointer-memaccess" >> Makefile
-        # Also remove Werror from subdir Makefiles just in case
         sed -i 's/-Werror//g' drivers/clk/Makefile
+        
+        # FIX: Correct the typo "-implicit-function-declaration" to "-Wimplicit-function-declaration"
+        # This fixes the "unrecognized command-line option" error
+        sed -i 's/-implicit-function-declaration/-Wimplicit-function-declaration/g' Makefile
 
     - name: Build Kernel
       run: |
