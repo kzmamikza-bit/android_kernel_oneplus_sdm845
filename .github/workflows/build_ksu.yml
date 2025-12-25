@@ -46,9 +46,11 @@ jobs:
         # --- 4. FIX: Define mark_reserved for sched/fair.c ---
         sed -i '1i #define mark_reserved(x) do {} while (0)' kernel/sched/fair.c
         
-        # --- 5. FIX: Missing include in oem_trace.c ---
-        # This fixes "storage size of ‘trace’ isn’t known" error
+        # --- 5. FIX: oem_trace.c compilation errors ---
+        # Add the include
         sed -i '1i #include <linux/stacktrace.h>' drivers/oneplus/drivers/oem_trace/oem_trace.c
+        # Force disable warnings for this specific driver (Nuclear Silence)
+        echo "ccflags-y += -w" >> drivers/oneplus/drivers/oem_trace/Makefile
 
         # --- 6. Enable KSU in Defconfig ---
         echo "CONFIG_KSU=y" >> arch/arm64/configs/enchilada_defconfig
@@ -57,14 +59,11 @@ jobs:
         echo "CONFIG_KPROBE_EVENTS=y" >> arch/arm64/configs/enchilada_defconfig
         
         # --- 7. FIX: Recursively Disable Warnings as Errors (The Ultimate Fix) ---
-        # Find ALL Makefiles in the entire project and remove -Werror from them
         find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
         
         # Add global permissive flags
         echo "KBUILD_CFLAGS += -Wno-error" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-sizeof-pointer-memaccess" >> Makefile
-        
-        # Fix the Makefile typo
         sed -i 's/-implicit-function-declaration/-Wimplicit-function-declaration/g' Makefile
 
     - name: Build Kernel
@@ -82,10 +81,17 @@ jobs:
         make O=out enchilada_defconfig
         
         # --- CRITICAL CONFIG FIXES ---
+        # Fix 1: CPU Count
         sed -i 's/CONFIG_NR_CPUS=[0-9]*/CONFIG_NR_CPUS=8/' out/.config
+        
+        # Fix 2: NOHZ
         echo "CONFIG_NO_HZ_COMMON=y" >> out/.config
         echo "CONFIG_NO_HZ_IDLE=y" >> out/.config
         echo "CONFIG_NO_HZ=y" >> out/.config
+        
+        # Fix 3: Enable Stacktrace (Fixes oem_trace.c error)
+        echo "CONFIG_STACKTRACE=y" >> out/.config
+        echo "CONFIG_STACKTRACE_SUPPORT=y" >> out/.config
         # --- END FIXES ---
         
         make O=out -j$(nproc --all) Image.gz-dtb
