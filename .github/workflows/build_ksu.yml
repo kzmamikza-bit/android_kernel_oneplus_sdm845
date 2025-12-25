@@ -28,21 +28,18 @@ jobs:
         # --- 1. KernelSU Setup ---
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
 
-        # --- 2. Apply Manual Hooks for Kernel 4.9 (Safe Mode) ---
+        # --- 2. Apply Manual Hooks for Kernel 4.9 ---
         
-        # FIX fs/exec.c
-        # Insert include at the very top (Line 1) to avoid implicit declaration errors
+        # FIX fs/exec.c (This part was working fine)
         sed -i '1i #include "../drivers/kernelsu/ksu.h"' fs/exec.c
         sed -i '/return retval;/i \\tif (ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags)) return 0;' fs/exec.c
         
-        # FIX fs/open.c (C90 Compliance Fix)
-        # 1. Insert header at Line 1
-        sed -i '1i #include "../drivers/kernelsu/ksu.h"' fs/open.c
+        # FIX fs/open.c (THE NUCLEAR FIX)
+        # Instead of just including the header, we manually declare the function prototype (extern int...)
+        # This forces the compiler to recognize the function, bypassing the "implicit declaration" error completely.
+        # We insert this definition AND the hook logic after "struct filename *tmp;" to satisfy C90 rules.
         
-        # 2. Insert hook AFTER "struct filename *tmp;" 
-        # This ensures we are after all variable declarations (fixing C90 mixed declaration error)
-        # and inside the do_sys_open function where 'dfd' is valid.
-        sed -i '/struct filename \*tmp;/a \\tif (ksu_handle_faccessat(&dfd, &filename, &mode, NULL)) return 0;' fs/open.c
+        sed -i '/struct filename \*tmp;/a extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n\tif (ksu_handle_faccessat(&dfd, &filename, &mode, NULL)) return 0;' fs/open.c
 
         # --- 3. FIX: Define missing OnePlus CPU constants ---
         sed -i '1i #define LITTLE_CLUSTER_CPU_NUMBER 0' kernel/power/main.c
