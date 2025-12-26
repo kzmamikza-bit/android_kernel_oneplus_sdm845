@@ -64,22 +64,20 @@ jobs:
         /* End Dummy Functions */
         EOF
         
-        # --- 6. FIX: Device Tree (DTC) Errors (THE IMPOSTOR STRATEGY) ---
-        # Instead of breaking the Makefile by deleting lines, we trick the build system.
-        # We find a working DTS file (sdm845-mtp.dtsi) and copy it over the broken ones.
-        # This makes the build happy because the file exists and is valid syntax.
+        # --- 6. FIX: Device Tree (DTC) Errors (THE IMPOSTOR STRATEGY v2) ---
+        # We find a working DTS file (sdm845-mtp.dtsi) and copy it over broken ones.
         
-        # We search for the base MTP file (usually sdm845-mtp.dts or .dtsi)
         MTP_FILE=$(find arch/arm64/boot/dts/qcom -name "*sdm845-mtp.dts*" | head -n 1)
         
         if [ -f "$MTP_FILE" ]; then
             echo "Found working DTS: $MTP_FILE"
-            # Overwrite all CDP variants with the MTP file
+            # Overwrite CDP files
             find arch/arm64/boot/dts/qcom -name "*cdp*.dts*" -exec cp "$MTP_FILE" {} \;
-            echo "Replaced all broken CDP files with MTP version."
+            # Overwrite INTERPOSER files (New!)
+            find arch/arm64/boot/dts/qcom -name "*interposer*.dts*" -exec cp "$MTP_FILE" {} \;
+            echo "Replaced all broken CDP and INTERPOSER files with MTP version."
         else
             echo "Warning: MTP DTS not found, trying fallback deletion."
-            # Fallback (old method) but safer: only delete lines ending in .dtb
             sed -i '/cdp\.dtb/d' arch/arm64/boot/dts/qcom/Makefile
         fi
         
@@ -92,11 +90,14 @@ jobs:
         mkdir -p include/linux/sched
         echo -e "#include <linux/sched.h>\n#include <linux/signal.h>" > include/linux/sched/signal.h
         
-        # C. Fix TWA_RESUME
+        # C. Fix pgtable.h (New!)
+        # Redirect linux/pgtable.h to asm/pgtable.h
+        echo '#include <asm/pgtable.h>' > include/linux/pgtable.h
+        
+        # D. Fix TWA_RESUME
         sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/allowlist.c
         
-        # D. FIX: struct seccomp has no filter_count (New Fix!)
-        # We simply delete the line that tries to reset this counter.
+        # E. Fix filter_count
         sed -i '/filter_count/d' drivers/kernelsu/app_profile.c
 
     - name: Build Kernel
