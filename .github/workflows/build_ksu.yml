@@ -126,25 +126,26 @@ jobs:
         sed -i 's/refcount_read/atomic_read/g' drivers/kernelsu/seccomp_cache.c
         sed -i 's/refcount_dec_and_test/atomic_dec_and_test/g' drivers/kernelsu/seccomp_cache.c
 
-        # N. FIX: file_wrapper.c (RESTORE & CLEAN FIX) - REVISED!
-        # 1. Reset the file (Delete and Download fresh)
+        # N. FIX: file_wrapper.c (ADVANCED SURGERY v2) - REVISED!
+        # 1. Reset file
         rm -f drivers/kernelsu/file_wrapper.c
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/file_wrapper.c" -o drivers/kernelsu/file_wrapper.c
         
         # 2. Add typedef for __poll_t
         sed -i '1i typedef unsigned int __poll_t;' drivers/kernelsu/file_wrapper.c
         
-        # 3. DELETE WHOLE FUNCTIONS (Using range deletion /start/,/^}/d)
-        # Delete ksu_wrapper_iopoll (Whole block)
+        # 3. FIX: Remove struct definition in .c file (Duplicate of .h)
+        sed -i '/struct ksu_file_wrapper {/,/^};/d' drivers/kernelsu/file_wrapper.c
+        
+        # 4. FIX: Remove "static" to match header declaration
+        sed -i 's/static struct ksu_file_wrapper/struct ksu_file_wrapper/g' drivers/kernelsu/file_wrapper.c
+
+        # 5. Delete Unsupported Function BODIES
         sed -i '/int ksu_wrapper_iopoll/,/^}/d' drivers/kernelsu/file_wrapper.c
-        
-        # Delete ksu_wrapper_remap_file_range (Whole block)
         sed -i '/loff_t ksu_wrapper_remap_file_range/,/^}/d' drivers/kernelsu/file_wrapper.c
-        
-        # Delete ksu_wrapper_fadvise (Whole block)
         sed -i '/int ksu_wrapper_fadvise/,/^}/d' drivers/kernelsu/file_wrapper.c
         
-        # 4. REMOVE STRUCT MEMBERS ASSIGNMENTS
+        # 6. Delete ASSIGNMENTS inside ksu_create_file_wrapper
         sed -i '/\.iopoll =/d' drivers/kernelsu/file_wrapper.c
         sed -i '/\.remap_file_range =/d' drivers/kernelsu/file_wrapper.c
         sed -i '/\.fadvise =/d' drivers/kernelsu/file_wrapper.c
