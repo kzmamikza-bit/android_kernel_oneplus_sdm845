@@ -64,7 +64,7 @@ jobs:
         /* End Dummy Functions */
         EOF
         
-        # --- 6. FIX: Device Tree (DTC) Errors (THE IMPOSTOR STRATEGY v2) ---
+        # --- 6. FIX: Device Tree (DTC) Errors (THE IMPOSTOR STRATEGY v3) ---
         # We find a working DTS file (sdm845-mtp.dtsi) and copy it over broken ones.
         
         MTP_FILE=$(find arch/arm64/boot/dts/qcom -name "*sdm845-mtp.dts*" | head -n 1)
@@ -73,9 +73,11 @@ jobs:
             echo "Found working DTS: $MTP_FILE"
             # Overwrite CDP files
             find arch/arm64/boot/dts/qcom -name "*cdp*.dts*" -exec cp "$MTP_FILE" {} \;
-            # Overwrite INTERPOSER files (New!)
+            # Overwrite INTERPOSER files
             find arch/arm64/boot/dts/qcom -name "*interposer*.dts*" -exec cp "$MTP_FILE" {} \;
-            echo "Replaced all broken CDP and INTERPOSER files with MTP version."
+            # Overwrite RB3 files (New!)
+            find arch/arm64/boot/dts/qcom -name "*rb3*.dts*" -exec cp "$MTP_FILE" {} \;
+            echo "Replaced all broken CDP, INTERPOSER, and RB3 files with MTP version."
         else
             echo "Warning: MTP DTS not found, trying fallback deletion."
             sed -i '/cdp\.dtb/d' arch/arm64/boot/dts/qcom/Makefile
@@ -90,14 +92,17 @@ jobs:
         mkdir -p include/linux/sched
         echo -e "#include <linux/sched.h>\n#include <linux/signal.h>" > include/linux/sched/signal.h
         
-        # C. Fix pgtable.h (New!)
-        # Redirect linux/pgtable.h to asm/pgtable.h
+        # C. Fix pgtable.h
         echo '#include <asm/pgtable.h>' > include/linux/pgtable.h
         
-        # D. Fix TWA_RESUME
+        # D. Fix task_stack.h (New!)
+        # Redirect linux/sched/task_stack.h to linux/sched.h
+        echo '#include <linux/sched.h>' > include/linux/sched/task_stack.h
+        
+        # E. Fix TWA_RESUME
         sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/allowlist.c
         
-        # E. Fix filter_count
+        # F. Fix filter_count
         sed -i '/filter_count/d' drivers/kernelsu/app_profile.c
 
     - name: Build Kernel
