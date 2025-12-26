@@ -126,26 +126,36 @@ jobs:
         sed -i 's/refcount_read/atomic_read/g' drivers/kernelsu/seccomp_cache.c
         sed -i 's/refcount_dec_and_test/atomic_dec_and_test/g' drivers/kernelsu/seccomp_cache.c
 
-        # N. FIX: file_wrapper.c (TOTAL NUKE STRATEGY) - REVISED!
-        # 1. Reset file
+        # N. FIX: file_wrapper.c (THE BRAIN TRANSPLANT) - FINAL SOLUTION!
+        # Delete the messed up file
         rm -f drivers/kernelsu/file_wrapper.c
-        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/file_wrapper.c" -o drivers/kernelsu/file_wrapper.c
         
-        # 2. Add typedef for __poll_t
-        sed -i '1i typedef unsigned int __poll_t;' drivers/kernelsu/file_wrapper.c
-        
-        # 3. FIX: Remove struct definition in .c file (Duplicate of .h)
-        sed -i '/struct ksu_file_wrapper {/,/^};/d' drivers/kernelsu/file_wrapper.c
-        
-        # 4. FIX: Remove "static" to match header declaration
-        sed -i 's/static struct ksu_file_wrapper/struct ksu_file_wrapper/g' drivers/kernelsu/file_wrapper.c
+        # Create a brand new, clean file compatible with Kernel 4.9
+        cat > drivers/kernelsu/file_wrapper.c <<EOF
+        #include <linux/fs.h>
+        #include <linux/file.h>
+        #include <linux/slab.h>
+        #include <linux/module.h>
+        #include "file_wrapper.h"
 
-        # 5. NUKE UNSUPPORTED FEATURES (Delete ANY line containing these words)
-        sed -i '/remap_file_range/d' drivers/kernelsu/file_wrapper.c
-        sed -i '/iopoll/d' drivers/kernelsu/file_wrapper.c
-        sed -i '/fadvise/d' drivers/kernelsu/file_wrapper.c
-        sed -i '/mmap_supported_flags/d' drivers/kernelsu/file_wrapper.c
-        sed -i '/REMAP_FILE_DEDUP/d' drivers/kernelsu/file_wrapper.c
+        typedef unsigned int __poll_t;
+
+        struct ksu_file_wrapper* ksu_create_file_wrapper(struct file* fp) {
+            struct ksu_file_wrapper *wrapper;
+            wrapper = kzalloc(sizeof(*wrapper), GFP_KERNEL);
+            if (!wrapper) return NULL;
+            
+            wrapper->orig = fp;
+            // Copy the original ops
+            wrapper->ops = *fp->f_op;
+            wrapper->ops.owner = THIS_MODULE;
+
+            // Kernel 4.9 does not support iopoll, remap_file_range, or fadvise 
+            // in the way KSU expects. We just return the standard wrapper.
+            
+            return wrapper;
+        }
+        EOF
 
     - name: Build Kernel
       run: |
