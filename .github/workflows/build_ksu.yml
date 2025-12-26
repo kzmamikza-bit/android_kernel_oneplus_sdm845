@@ -66,18 +66,22 @@ jobs:
         /* End Dummy Functions */
         EOF
         
-        # --- 7. FIX: Device Tree (DTC) Errors ---
-        sed -i 's/sdm845-cdp.dtb//g' arch/arm64/boot/dts/qcom/Makefile
-        sed -i 's/sdm845-v2-cdp.dtb//g' arch/arm64/boot/dts/qcom/Makefile
-        sed -i 's/sdm845-cdp-overlay.dtb//g' arch/arm64/boot/dts/qcom/Makefile
+        # --- 7. FIX: Device Tree (DTC) Errors (NUCLEAR OPTION) ---
+        # Instead of removing files one by one, we delete ANY line containing "cdp" from the Makefile
+        # This will kill sdm845-cdp, sdm845-v2-cdp, sdm845-4k-panel-cdp, etc.
+        sed -i '/cdp/d' arch/arm64/boot/dts/qcom/Makefile
         
         # --- 8. FIX: KernelSU Compatibility with Old Kernel (4.9) ---
-        # A. Create fake compiler_types.h
+        
+        # A. Fix compiler_types.h
         echo '#include <linux/compiler.h>' > include/linux/compiler_types.h
         
-        # B. Define TWA_RESUME manually in allowlist.c
-        # In Kernel 4.9, the 3rd argument is a boolean (1=notify, 0=don't).
-        # TWA_RESUME corresponds to "notify", so we define it as 1.
+        # B. Fix sched/signal.h (Missing Header Fix)
+        # We create the directory structure and the file, pointing to the old locations
+        mkdir -p include/linux/sched
+        echo -e "#include <linux/sched.h>\n#include <linux/signal.h>" > include/linux/sched/signal.h
+        
+        # C. Fix TWA_RESUME
         sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/allowlist.c
 
     - name: Build Kernel
