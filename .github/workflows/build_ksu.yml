@@ -148,8 +148,7 @@ jobs:
         }
         EOF
 
-        # O. FIX: util.c (HEADER ORDER FIX) - REVISED!
-        # Create a temp file with the headers FIRST
+        # O. FIX: util.c (HEADER ORDER FIX - WORKING)
         cat > drivers/kernelsu/ksu_fix_header.h <<EOF
         #include <linux/sched.h>
         #include <linux/mm.h>
@@ -157,10 +156,12 @@ jobs:
         typedef pud_t p4d_t;
         #define p4d_offset(pgd, address) ((p4d_t *)pgd)
         EOF
-        
-        # Combine fix + original file (Prepend)
         cat drivers/kernelsu/ksu_fix_header.h drivers/kernelsu/util.c > drivers/kernelsu/util.temp
         mv drivers/kernelsu/util.temp drivers/kernelsu/util.c
+
+        # P. FIX: selinux.c (Use legacy variable for Kernel 4.9) - NEW!
+        sed -i '1i extern int selinux_enforcing;' drivers/kernelsu/selinux/selinux.c
+        sed -i 's/selinux_state.enforcing/selinux_enforcing/g' drivers/kernelsu/selinux/selinux.c
 
     - name: Build Kernel
       run: |
