@@ -94,8 +94,7 @@ jobs:
         # D. Fix task_stack.h
         echo '#include <linux/sched.h>' > include/linux/sched/task_stack.h
 
-        # E. Fix task.h (NEW!)
-        # Redirect linux/sched/task.h to linux/sched.h
+        # E. Fix task.h
         echo '#include <linux/sched.h>' > include/linux/sched/task.h
         
         # F. Fix TWA_RESUME (allowlist.c)
@@ -118,6 +117,16 @@ jobs:
 
         # L. FIX: ksud.c (TWA_RESUME missing)
         sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/ksud.c
+
+        # M. FIX: seccomp_cache.c (Missing Constant & Modern Types) - NEW!
+        # 1. Define missing constant
+        sed -i '1i #define SECCOMP_ARCH_NATIVE_NR 1' drivers/kernelsu/seccomp_cache.c
+        # 2. Replace refcount_t with atomic_t (Old Kernel way)
+        sed -i 's/refcount_t/atomic_t/g' drivers/kernelsu/seccomp_cache.c
+        sed -i 's/refcount_set/atomic_set/g' drivers/kernelsu/seccomp_cache.c
+        sed -i 's/refcount_inc/atomic_inc/g' drivers/kernelsu/seccomp_cache.c
+        sed -i 's/refcount_read/atomic_read/g' drivers/kernelsu/seccomp_cache.c
+        sed -i 's/refcount_dec_and_test/atomic_dec_and_test/g' drivers/kernelsu/seccomp_cache.c
 
     - name: Build Kernel
       run: |
