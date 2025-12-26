@@ -67,15 +67,18 @@ jobs:
         EOF
         
         # --- 7. FIX: Device Tree (DTC) Errors ---
-        # We remove ALL "cdp" board references to be safe (v1, v2, etc.)
         sed -i 's/sdm845-cdp.dtb//g' arch/arm64/boot/dts/qcom/Makefile
         sed -i 's/sdm845-v2-cdp.dtb//g' arch/arm64/boot/dts/qcom/Makefile
         sed -i 's/sdm845-cdp-overlay.dtb//g' arch/arm64/boot/dts/qcom/Makefile
         
         # --- 8. FIX: KernelSU Compatibility with Old Kernel (4.9) ---
-        # KernelSU expects <linux/compiler_types.h> which is new.
-        # We create a fake one that points to the old <linux/compiler.h>
+        # A. Create fake compiler_types.h
         echo '#include <linux/compiler.h>' > include/linux/compiler_types.h
+        
+        # B. Define TWA_RESUME manually in allowlist.c
+        # In Kernel 4.9, the 3rd argument is a boolean (1=notify, 0=don't).
+        # TWA_RESUME corresponds to "notify", so we define it as 1.
+        sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/allowlist.c
 
     - name: Build Kernel
       run: |
