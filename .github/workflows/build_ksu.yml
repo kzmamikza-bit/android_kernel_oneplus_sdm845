@@ -94,7 +94,7 @@ jobs:
         # D. Fix task_stack.h
         echo '#include <linux/sched.h>' > include/linux/sched/task_stack.h
         
-        # E. Fix TWA_RESUME
+        # E. Fix TWA_RESUME (allowlist.c)
         sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/allowlist.c
         
         # F. Fix filter_count
@@ -104,9 +104,11 @@ jobs:
         sed -i 's/handle_inode_event/handle_event/g' drivers/kernelsu/pkg_observer.c
         
         # H. FIX: setuid_hook.c (force_sig mismatch)
-        # Old kernel expects force_sig(sig, task), new kernel only force_sig(sig)
-        # We replace force_sig(SIGKILL) with force_sig(SIGKILL, current)
         sed -i 's/force_sig(SIGKILL)/force_sig(SIGKILL, current)/g' drivers/kernelsu/setuid_hook.c
+
+        # I. FIX: kernel_umount.c (TWA_RESUME missing)
+        # Same fix as allowlist.c, we define TWA_RESUME as 1
+        sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/kernel_umount.c
 
     - name: Build Kernel
       run: |
