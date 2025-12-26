@@ -109,8 +109,11 @@ jobs:
         # I. FIX: kernel_umount.c (TWA_RESUME missing)
         sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/kernel_umount.c
 
-        # J. FIX: supercalls.c (TWA_RESUME missing) - NEW!
+        # J. FIX: supercalls.c (TWA_RESUME missing)
         sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/supercalls.c
+
+        # K. FIX: ksud.c (TWA_RESUME missing) - NEW!
+        sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/ksud.c
 
     - name: Build Kernel
       run: |
