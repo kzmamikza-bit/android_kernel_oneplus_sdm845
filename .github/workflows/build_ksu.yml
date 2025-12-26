@@ -126,7 +126,7 @@ jobs:
         sed -i 's/refcount_read/atomic_read/g' drivers/kernelsu/seccomp_cache.c
         sed -i 's/refcount_dec_and_test/atomic_dec_and_test/g' drivers/kernelsu/seccomp_cache.c
 
-        # N. FIX: file_wrapper.c (ADVANCED SURGERY v2) - REVISED!
+        # N. FIX: file_wrapper.c (TOTAL NUKE STRATEGY) - REVISED!
         # 1. Reset file
         rm -f drivers/kernelsu/file_wrapper.c
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/file_wrapper.c" -o drivers/kernelsu/file_wrapper.c
@@ -140,16 +140,11 @@ jobs:
         # 4. FIX: Remove "static" to match header declaration
         sed -i 's/static struct ksu_file_wrapper/struct ksu_file_wrapper/g' drivers/kernelsu/file_wrapper.c
 
-        # 5. Delete Unsupported Function BODIES
-        sed -i '/int ksu_wrapper_iopoll/,/^}/d' drivers/kernelsu/file_wrapper.c
-        sed -i '/loff_t ksu_wrapper_remap_file_range/,/^}/d' drivers/kernelsu/file_wrapper.c
-        sed -i '/int ksu_wrapper_fadvise/,/^}/d' drivers/kernelsu/file_wrapper.c
-        
-        # 6. Delete ASSIGNMENTS inside ksu_create_file_wrapper
-        sed -i '/\.iopoll =/d' drivers/kernelsu/file_wrapper.c
-        sed -i '/\.remap_file_range =/d' drivers/kernelsu/file_wrapper.c
-        sed -i '/\.fadvise =/d' drivers/kernelsu/file_wrapper.c
-        sed -i '/\.mmap_supported_flags =/d' drivers/kernelsu/file_wrapper.c
+        # 5. NUKE UNSUPPORTED FEATURES (Delete ANY line containing these words)
+        sed -i '/remap_file_range/d' drivers/kernelsu/file_wrapper.c
+        sed -i '/iopoll/d' drivers/kernelsu/file_wrapper.c
+        sed -i '/fadvise/d' drivers/kernelsu/file_wrapper.c
+        sed -i '/mmap_supported_flags/d' drivers/kernelsu/file_wrapper.c
         sed -i '/REMAP_FILE_DEDUP/d' drivers/kernelsu/file_wrapper.c
 
     - name: Build Kernel
