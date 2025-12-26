@@ -126,11 +126,8 @@ jobs:
         sed -i 's/refcount_read/atomic_read/g' drivers/kernelsu/seccomp_cache.c
         sed -i 's/refcount_dec_and_test/atomic_dec_and_test/g' drivers/kernelsu/seccomp_cache.c
 
-        # N. FIX: file_wrapper.c (THE BRAIN TRANSPLANT) - FINAL SOLUTION!
-        # Delete the messed up file
+        # N. FIX: file_wrapper.c (THE BRAIN TRANSPLANT)
         rm -f drivers/kernelsu/file_wrapper.c
-        
-        # Create a brand new, clean file compatible with Kernel 4.9
         cat > drivers/kernelsu/file_wrapper.c <<EOF
         #include <linux/fs.h>
         #include <linux/file.h>
@@ -144,18 +141,18 @@ jobs:
             struct ksu_file_wrapper *wrapper;
             wrapper = kzalloc(sizeof(*wrapper), GFP_KERNEL);
             if (!wrapper) return NULL;
-            
             wrapper->orig = fp;
-            // Copy the original ops
             wrapper->ops = *fp->f_op;
             wrapper->ops.owner = THIS_MODULE;
-
-            // Kernel 4.9 does not support iopoll, remap_file_range, or fadvise 
-            // in the way KSU expects. We just return the standard wrapper.
-            
             return wrapper;
         }
         EOF
+
+        # O. FIX: util.c (Missing headers and P4D paging) - NEW!
+        sed -i '1i #include <linux/sched.h>' drivers/kernelsu/util.c
+        sed -i '1i #include <linux/mm.h>' drivers/kernelsu/util.c
+        sed -i '1i typedef pud_t p4d_t;' drivers/kernelsu/util.c
+        sed -i '1i #define p4d_offset(pgd, address) ((p4d_t *)pgd)' drivers/kernelsu/util.c
 
     - name: Build Kernel
       run: |
