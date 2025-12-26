@@ -126,18 +126,30 @@ jobs:
         sed -i 's/refcount_read/atomic_read/g' drivers/kernelsu/seccomp_cache.c
         sed -i 's/refcount_dec_and_test/atomic_dec_and_test/g' drivers/kernelsu/seccomp_cache.c
 
-        # N. FIX: file_wrapper.c (MASSIVE CLEANUP for Kernel 4.9) - NEW!
-        # 1. Define missing __poll_t
+        # N. FIX: file_wrapper.c (RESTORE & CLEAN FIX) - REVISED!
+        # 1. Reset the file (Delete and Download fresh)
+        rm -f drivers/kernelsu/file_wrapper.c
+        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/file_wrapper.c" -o drivers/kernelsu/file_wrapper.c
+        
+        # 2. Add typedef for __poll_t
         sed -i '1i typedef unsigned int __poll_t;' drivers/kernelsu/file_wrapper.c
-        # 2. Remove iopoll (not in 4.9)
-        sed -i '/iopoll/d' drivers/kernelsu/file_wrapper.c
-        # 3. Remove remap_file_range (not in 4.9)
-        sed -i '/remap_file_range/d' drivers/kernelsu/file_wrapper.c
+        
+        # 3. DELETE WHOLE FUNCTIONS (Using range deletion /start/,/^}/d)
+        # Delete ksu_wrapper_iopoll (Whole block)
+        sed -i '/int ksu_wrapper_iopoll/,/^}/d' drivers/kernelsu/file_wrapper.c
+        
+        # Delete ksu_wrapper_remap_file_range (Whole block)
+        sed -i '/loff_t ksu_wrapper_remap_file_range/,/^}/d' drivers/kernelsu/file_wrapper.c
+        
+        # Delete ksu_wrapper_fadvise (Whole block)
+        sed -i '/int ksu_wrapper_fadvise/,/^}/d' drivers/kernelsu/file_wrapper.c
+        
+        # 4. REMOVE STRUCT MEMBERS ASSIGNMENTS
+        sed -i '/\.iopoll =/d' drivers/kernelsu/file_wrapper.c
+        sed -i '/\.remap_file_range =/d' drivers/kernelsu/file_wrapper.c
+        sed -i '/\.fadvise =/d' drivers/kernelsu/file_wrapper.c
+        sed -i '/\.mmap_supported_flags =/d' drivers/kernelsu/file_wrapper.c
         sed -i '/REMAP_FILE_DEDUP/d' drivers/kernelsu/file_wrapper.c
-        # 4. Remove fadvise (not in f_op in 4.9)
-        sed -i '/fadvise/d' drivers/kernelsu/file_wrapper.c
-        # 5. Remove mmap_supported_flags (not in 4.9)
-        sed -i '/mmap_supported_flags/d' drivers/kernelsu/file_wrapper.c
 
     - name: Build Kernel
       run: |
