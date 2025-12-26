@@ -93,26 +93,30 @@ jobs:
         
         # D. Fix task_stack.h
         echo '#include <linux/sched.h>' > include/linux/sched/task_stack.h
+
+        # E. Fix task.h (NEW!)
+        # Redirect linux/sched/task.h to linux/sched.h
+        echo '#include <linux/sched.h>' > include/linux/sched/task.h
         
-        # E. Fix TWA_RESUME (allowlist.c)
+        # F. Fix TWA_RESUME (allowlist.c)
         sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/allowlist.c
         
-        # F. Fix filter_count
+        # G. Fix filter_count
         sed -i '/filter_count/d' drivers/kernelsu/app_profile.c
         
-        # G. FIX: pkg_observer.c (handle_inode_event -> handle_event)
+        # H. FIX: pkg_observer.c (handle_inode_event -> handle_event)
         sed -i 's/handle_inode_event/handle_event/g' drivers/kernelsu/pkg_observer.c
         
-        # H. FIX: setuid_hook.c (force_sig mismatch)
+        # I. FIX: setuid_hook.c (force_sig mismatch)
         sed -i 's/force_sig(SIGKILL)/force_sig(SIGKILL, current)/g' drivers/kernelsu/setuid_hook.c
 
-        # I. FIX: kernel_umount.c (TWA_RESUME missing)
+        # J. FIX: kernel_umount.c (TWA_RESUME missing)
         sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/kernel_umount.c
 
-        # J. FIX: supercalls.c (TWA_RESUME missing)
+        # K. FIX: supercalls.c (TWA_RESUME missing)
         sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/supercalls.c
 
-        # K. FIX: ksud.c (TWA_RESUME missing) - NEW!
+        # L. FIX: ksud.c (TWA_RESUME missing)
         sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/ksud.c
 
     - name: Build Kernel
