@@ -118,15 +118,26 @@ jobs:
         # L. FIX: ksud.c (TWA_RESUME missing)
         sed -i '1i #define TWA_RESUME 1' drivers/kernelsu/ksud.c
 
-        # M. FIX: seccomp_cache.c (Missing Constant & Modern Types) - NEW!
-        # 1. Define missing constant
+        # M. FIX: seccomp_cache.c (Missing Constant & Modern Types)
         sed -i '1i #define SECCOMP_ARCH_NATIVE_NR 1' drivers/kernelsu/seccomp_cache.c
-        # 2. Replace refcount_t with atomic_t (Old Kernel way)
         sed -i 's/refcount_t/atomic_t/g' drivers/kernelsu/seccomp_cache.c
         sed -i 's/refcount_set/atomic_set/g' drivers/kernelsu/seccomp_cache.c
         sed -i 's/refcount_inc/atomic_inc/g' drivers/kernelsu/seccomp_cache.c
         sed -i 's/refcount_read/atomic_read/g' drivers/kernelsu/seccomp_cache.c
         sed -i 's/refcount_dec_and_test/atomic_dec_and_test/g' drivers/kernelsu/seccomp_cache.c
+
+        # N. FIX: file_wrapper.c (MASSIVE CLEANUP for Kernel 4.9) - NEW!
+        # 1. Define missing __poll_t
+        sed -i '1i typedef unsigned int __poll_t;' drivers/kernelsu/file_wrapper.c
+        # 2. Remove iopoll (not in 4.9)
+        sed -i '/iopoll/d' drivers/kernelsu/file_wrapper.c
+        # 3. Remove remap_file_range (not in 4.9)
+        sed -i '/remap_file_range/d' drivers/kernelsu/file_wrapper.c
+        sed -i '/REMAP_FILE_DEDUP/d' drivers/kernelsu/file_wrapper.c
+        # 4. Remove fadvise (not in f_op in 4.9)
+        sed -i '/fadvise/d' drivers/kernelsu/file_wrapper.c
+        # 5. Remove mmap_supported_flags (not in 4.9)
+        sed -i '/mmap_supported_flags/d' drivers/kernelsu/file_wrapper.c
 
     - name: Build Kernel
       run: |
