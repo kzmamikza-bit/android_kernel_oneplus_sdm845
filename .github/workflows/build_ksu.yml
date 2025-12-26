@@ -65,17 +65,13 @@ jobs:
         EOF
         
         # --- 6. FIX: Device Tree (DTC) Errors (THE IMPOSTOR STRATEGY v3) ---
-        # We find a working DTS file (sdm845-mtp.dtsi) and copy it over broken ones.
-        
         MTP_FILE=$(find arch/arm64/boot/dts/qcom -name "*sdm845-mtp.dts*" | head -n 1)
         
         if [ -f "$MTP_FILE" ]; then
             echo "Found working DTS: $MTP_FILE"
-            # Overwrite CDP files
+            # Overwrite CDP, INTERPOSER, and RB3 files
             find arch/arm64/boot/dts/qcom -name "*cdp*.dts*" -exec cp "$MTP_FILE" {} \;
-            # Overwrite INTERPOSER files
             find arch/arm64/boot/dts/qcom -name "*interposer*.dts*" -exec cp "$MTP_FILE" {} \;
-            # Overwrite RB3 files (New!)
             find arch/arm64/boot/dts/qcom -name "*rb3*.dts*" -exec cp "$MTP_FILE" {} \;
             echo "Replaced all broken CDP, INTERPOSER, and RB3 files with MTP version."
         else
@@ -95,8 +91,7 @@ jobs:
         # C. Fix pgtable.h
         echo '#include <asm/pgtable.h>' > include/linux/pgtable.h
         
-        # D. Fix task_stack.h (New!)
-        # Redirect linux/sched/task_stack.h to linux/sched.h
+        # D. Fix task_stack.h
         echo '#include <linux/sched.h>' > include/linux/sched/task_stack.h
         
         # E. Fix TWA_RESUME
@@ -104,6 +99,9 @@ jobs:
         
         # F. Fix filter_count
         sed -i '/filter_count/d' drivers/kernelsu/app_profile.c
+        
+        # G. FIX: pkg_observer.c (handle_inode_event -> handle_event for Kernel 4.9)
+        sed -i 's/handle_inode_event/handle_event/g' drivers/kernelsu/pkg_observer.c
 
     - name: Build Kernel
       run: |
