@@ -100,8 +100,13 @@ jobs:
         # F. Fix filter_count
         sed -i '/filter_count/d' drivers/kernelsu/app_profile.c
         
-        # G. FIX: pkg_observer.c (handle_inode_event -> handle_event for Kernel 4.9)
+        # G. FIX: pkg_observer.c (handle_inode_event -> handle_event)
         sed -i 's/handle_inode_event/handle_event/g' drivers/kernelsu/pkg_observer.c
+        
+        # H. FIX: setuid_hook.c (force_sig mismatch)
+        # Old kernel expects force_sig(sig, task), new kernel only force_sig(sig)
+        # We replace force_sig(SIGKILL) with force_sig(SIGKILL, current)
+        sed -i 's/force_sig(SIGKILL)/force_sig(SIGKILL, current)/g' drivers/kernelsu/setuid_hook.c
 
     - name: Build Kernel
       run: |
