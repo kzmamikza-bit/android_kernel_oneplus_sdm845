@@ -30,10 +30,8 @@ jobs:
         sed -i '/bprm = kzalloc/i \\tif (ksu_handle_execveat(&fd, (void *)&filename, (void *)&argv, (void *)&envp, &flags)) return 0;' fs/exec.c
         sed -i '/struct filename \*tmp;/a extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n\tif (ksu_handle_faccessat(&dfd, &filename, (int *)&mode, NULL)) return 0;' fs/open.c
 
-        # 3. FIX: Global Compiler Flags & Warnings
+        # 3. FIX: Drivers & Modern Clang Warnings
         find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
-        # Fix the specific implicit declaration error
-        find . -name "Makefile" -type f -exec sed -i 's/-implicit-function-declaration/-Wimplicit-function-declaration/g' {} +
         
         # 4. Kernel 4.9 Compatibility Headers
         echo '#include <linux/compiler.h>' > include/linux/compiler_types.h
@@ -106,14 +104,16 @@ jobs:
         echo "CONFIG_KSU=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
         
-        # FIX FOR SECURITY FLAGS
+        # DISABLE STACK PROTECTOR STRONG (FIX FOR ERROR)
         echo "# CONFIG_CC_STACKPROTECTOR_STRONG is not set" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_CC_STACKPROTECTOR_NONE=y" >> arch/arm64/configs/enchilada_defconfig
         
         make O=out enchilada_defconfig
         
-        # Final flag fixes before building
-        sed -i 's/-implicit-function-declaration/-Wimplicit-function-declaration/g' out/Makefile || true
+        # Force silence warnings in problematic drivers (Cam & Net)
+        echo "ccflags-y += -w" >> drivers/media/platform/msm/camera/cam_isp/isp_hw_mgr/hw_utils/irq_controller/Makefile
+        echo "ccflags-y += -w" >> drivers/net/can/spi/Makefile
+        echo "ccflags-y += -w" >> drivers/kernelsu/Makefile
 
         make O=out -j$(nproc --all) Image.gz-dtb
 
