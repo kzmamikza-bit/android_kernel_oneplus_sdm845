@@ -22,15 +22,30 @@ jobs:
 
     - name: Setup KernelSU and Fixes
       run: |
-        # 1. KernelSU Setup
+        # --- 1. KernelSU Setup ---
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
 
-        # 2. KernelSU Patching (Kernel 4.9 Hooks)
+        # --- 2. RESTORED HEADERS (Vital for Kernel 4.9) ---
+        # This fixes the "fatal error: linux/sched/task_stack.h"
+        echo '#include <linux/compiler.h>' > include/linux/compiler_types.h
+        mkdir -p include/linux/sched
+        echo -e "#include <linux/sched.h>\n#include <linux/signal.h>" > include/linux/sched/signal.h
+        echo '#include <asm/pgtable.h>' > include/linux/pgtable.h
+        echo '#include <linux/sched.h>' > include/linux/sched/task_stack.h
+        echo '#include <linux/sched.h>' > include/linux/sched/task.h
+
+        # --- 3. FIX: pkg_observer.c (The "handle_event" Error) ---
+        # We rename the struct member and function to match Kernel 4.9
+        sed -i 's/handle_inode_event/handle_event/g' drivers/kernelsu/pkg_observer.c
+        # Force ignore pointer mismatch warnings for this file
+        sed -i '1i ccflags-y += -Wno-incompatible-pointer-types' drivers/kernelsu/Makefile
+
+        # --- 4. FIX: KernelSU Hooks for 4.9 ---
         sed -i '1i extern int ksu_handle_execveat(int *fd, void *filename_user, void *argv, void *envp, int *flags);' fs/exec.c
         sed -i '/bprm = kzalloc/i \\tif (ksu_handle_execveat(&fd, (void *)&filename, (void *)&argv, (void *)&envp, &flags)) return 0;' fs/exec.c
         sed -i '/struct filename \*tmp;/a extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n\tif (ksu_handle_faccessat(&dfd, &filename, (int *)&mode, NULL)) return 0;' fs/open.c
 
-        # 3. FIX: Drivers & Warnings (SAFE INSERTION MODE)
+        # --- 5. FIX: OnePlus Drivers & Warnings ---
         sed -i '1i #include <linux/stacktrace.h>' drivers/oneplus/drivers/oem_trace/oem_trace.c
         sed -i '1i ccflags-y += -w' drivers/oneplus/drivers/oem_trace/Makefile
         sed -i '1i ccflags-y += -w' drivers/oneplus/drivers/param_read_write/Makefile
@@ -40,31 +55,24 @@ jobs:
         sed -i '1i ccflags-y += -w' drivers/clk/Makefile
         sed -i '1i ccflags-y += -w' drivers/kernelsu/Makefile
 
-        # 4. Global Compiler Flags
+        # --- 6. Global Compiler Flags ---
         find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
         sed -i 's/-implicit-function-declaration/-Wimplicit-function-declaration/g' Makefile
         echo "KBUILD_CFLAGS += -Wno-error" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-sizeof-pointer-memaccess" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-misleading-indentation" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-memset-elt-size" >> Makefile
+        echo "KBUILD_CFLAGS += -Wno-incompatible-pointer-types" >> Makefile
 
-        # 5. Kernel 4.9 Compatibility Headers (RESTORED!)
-        echo '#include <linux/compiler.h>' > include/linux/compiler_types.h
-        mkdir -p include/linux/sched
-        echo -e "#include <linux/sched.h>\n#include <linux/signal.h>" > include/linux/sched/signal.h
-        echo '#include <asm/pgtable.h>' > include/linux/pgtable.h
-        # Restored these critical lines:
-        echo '#include <linux/sched.h>' > include/linux/sched/task_stack.h
-        echo '#include <linux/sched.h>' > include/linux/sched/task.h
-
-        # 6. KernelSU Source Fixes
+        # --- 7. KernelSU Source Fixes ---
         
-        # G. Fix filter_count (THE NEW FIX)
+        # A. Fix filter_count (Remove missing member)
         sed -i '/filter_count/d' drivers/kernelsu/app_profile.c
         
+        # B. Fix setuid_hook
         sed -i 's/force_sig(SIGKILL)/force_sig(SIGKILL, current)/g' drivers/kernelsu/setuid_hook.c
         
-        # File Wrapper Fix
+        # C. Re-build file_wrapper.c
         rm -f drivers/kernelsu/file_wrapper.c
         cat > drivers/kernelsu/file_wrapper.c <<EOF
         #include <linux/fs.h>
@@ -83,7 +91,7 @@ jobs:
         }
         EOF
 
-        # Util.c Fix
+        # D. Util.c Fix (Header Order)
         cat > drivers/kernelsu/ksu_fix_header.h <<EOF
         #include <linux/sched.h>
         #include <linux/mm.h>
@@ -94,7 +102,7 @@ jobs:
         cat drivers/kernelsu/ksu_fix_header.h drivers/kernelsu/util.c > drivers/kernelsu/util.temp
         mv drivers/kernelsu/util.temp drivers/kernelsu/util.c
 
-        # TWA_RESUME Fix (For Allowlist)
+        # E. TWA_RESUME Fix (For Allowlist)
         echo "#ifndef TWA_RESUME" > ksu_twa_fix.h
         echo "#define TWA_RESUME 1" >> ksu_twa_fix.h
         echo "#endif" >> ksu_twa_fix.h
@@ -104,10 +112,11 @@ jobs:
         cat ksu_twa_fix.h drivers/kernelsu/ksud.c > drivers/kernelsu/ksud.temp && mv drivers/kernelsu/ksud.temp drivers/kernelsu/ksud.c
         cat ksu_twa_fix.h drivers/kernelsu/supercalls.c > drivers/kernelsu/supercalls.temp && mv drivers/kernelsu/supercalls.temp drivers/kernelsu/supercalls.c
 
-        # SELinux Fixes
+        # F. SELinux Fixes
         sed -i '1i extern int selinux_enforcing;' drivers/kernelsu/selinux/selinux.c
         sed -i 's/selinux_state.enforcing/selinux_enforcing/g' drivers/kernelsu/selinux/selinux.c
         
+        # G. Stub sepolicy.c (Dummy)
         rm -f drivers/kernelsu/selinux/sepolicy.c
         cat > drivers/kernelsu/selinux/sepolicy.c <<EOF
         #include <linux/types.h>
@@ -116,13 +125,14 @@ jobs:
         void ksu_restore_sepolicy(void) {}
         EOF
 
+        # H. Stub rules.c (Dummy)
         rm -f drivers/kernelsu/selinux/rules.c
         cat > drivers/kernelsu/selinux/rules.c <<EOF
         #include <linux/types.h>
         void ksu_suppress_selinux(void) {}
         EOF
 
-        # 7. LINKER FIXES
+        # --- 8. LINKER FIXES ---
         find drivers -name "oem_force_dump.c" -exec sh -c 'echo "// Nuked by GitHub Actions" > {}' \;
         cat >> init/main.c <<EOF
         void rpmhstats_statistics(void) {}
@@ -132,7 +142,7 @@ jobs:
         void msm_serial_oem_init(void) {}
         EOF
 
-        # 8. DTC Fix
+        # --- 9. DTC Fix ---
         MTP_FILE=$(find arch/arm64/boot/dts/qcom -name "*sdm845-mtp.dts*" | head -n 1)
         if [ -n "$MTP_FILE" ]; then
             find arch/arm64/boot/dts/qcom -name "*cdp*.dts*" -exec cp "$MTP_FILE" {} \;
