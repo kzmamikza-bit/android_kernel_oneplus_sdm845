@@ -48,11 +48,14 @@ jobs:
         echo "KBUILD_CFLAGS += -Wno-misleading-indentation" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-memset-elt-size" >> Makefile
 
-        # 5. Kernel 4.9 Compatibility Headers
+        # 5. Kernel 4.9 Compatibility Headers (RESTORED!)
         echo '#include <linux/compiler.h>' > include/linux/compiler_types.h
         mkdir -p include/linux/sched
         echo -e "#include <linux/sched.h>\n#include <linux/signal.h>" > include/linux/sched/signal.h
         echo '#include <asm/pgtable.h>' > include/linux/pgtable.h
+        # Restored these critical lines:
+        echo '#include <linux/sched.h>' > include/linux/sched/task_stack.h
+        echo '#include <linux/sched.h>' > include/linux/sched/task.h
 
         # 6. KernelSU Source Fixes
         
@@ -100,7 +103,6 @@ jobs:
         cat ksu_twa_fix.h drivers/kernelsu/kernel_umount.c > drivers/kernelsu/kernel_umount.temp && mv drivers/kernelsu/kernel_umount.temp drivers/kernelsu/kernel_umount.c
         cat ksu_twa_fix.h drivers/kernelsu/ksud.c > drivers/kernelsu/ksud.temp && mv drivers/kernelsu/ksud.temp drivers/kernelsu/ksud.c
         cat ksu_twa_fix.h drivers/kernelsu/supercalls.c > drivers/kernelsu/supercalls.temp && mv drivers/kernelsu/supercalls.temp drivers/kernelsu/supercalls.c
-
 
         # SELinux Fixes
         sed -i '1i extern int selinux_enforcing;' drivers/kernelsu/selinux/selinux.c
@@ -155,7 +157,6 @@ jobs:
         echo "CONFIG_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_KPROBE_EVENTS=y" >> arch/arm64/configs/enchilada_defconfig
-        
         echo "# CONFIG_CC_STACKPROTECTOR_STRONG is not set" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_CC_STACKPROTECTOR_NONE=y" >> arch/arm64/configs/enchilada_defconfig
         
