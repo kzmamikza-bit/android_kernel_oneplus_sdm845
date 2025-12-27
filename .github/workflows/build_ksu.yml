@@ -54,9 +54,10 @@ jobs:
         sed -i '1i ccflags-y += -w' drivers/kernelsu/Makefile
         sed -i '1i ccflags-y += -w' drivers/oneplus/coretech/cpufreq_bouncing/Makefile
         sed -i '1i ccflags-y += -w' drivers/oneplus/coretech/houston/Makefile
-        
-        # NEW FIX: Silence TPD Driver
         sed -i '1i ccflags-y += -w' drivers/oneplus/coretech/tpd/Makefile
+        
+        # NEW FIX: Silence Power Supply (Charging) Drivers
+        sed -i '1i ccflags-y += -w' drivers/power/supply/qcom/Makefile
 
         # --- 6. Global Compiler Flags ---
         find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
@@ -68,8 +69,9 @@ jobs:
         echo "KBUILD_CFLAGS += -Wno-incompatible-pointer-types" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-format" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-unused-result" >> Makefile
-        # NEW GLOBAL FIX: Ignore strict prototypes
         echo "KBUILD_CFLAGS += -Wno-strict-prototypes" >> Makefile
+        # NEW GLOBAL FIX: Ignore duplicate declarations
+        echo "KBUILD_CFLAGS += -Wno-duplicate-decl-specifier" >> Makefile
 
         # --- 7. KernelSU Source Fixes ---
         
