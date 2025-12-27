@@ -39,16 +39,23 @@ jobs:
 
         # --- 3. FIX: OnePlus Drivers Compilation Errors ---
         sed -i '1i #include <linux/stacktrace.h>' drivers/oneplus/drivers/oem_trace/oem_trace.c
-        # Force silence in problematic folders
+        
+        # Force silence in problematic folders (Original ones)
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/oem_trace/Makefile
         echo "ccflags-y += -w" >> drivers/oneplus/drivers/param_read_write/Makefile
-        # FIX: Synaptics Touchscreen Warning
         echo "ccflags-y += -w" >> drivers/input/touchscreen/Makefile
+        
+        # FIX: Camera Driver Warning (New Fix!)
+        echo "ccflags-y += -w" >> drivers/media/platform/msm/camera/cam_isp/isp_hw_mgr/hw_utils/irq_controller/Makefile
 
         # --- 4. FIX: Recursively Disable Warnings as Errors ---
         find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
+        
+        # Disable Global Warnings
         echo "KBUILD_CFLAGS += -Wno-error" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-sizeof-pointer-memaccess" >> Makefile
+        echo "KBUILD_CFLAGS += -Wno-misleading-indentation" >> Makefile
+        
         sed -i 's/-implicit-function-declaration/-Wimplicit-function-declaration/g' Makefile
 
         # --- 5. FIX: LINKER ERRORS (Nuke & Stub) ---
