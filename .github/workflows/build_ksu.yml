@@ -52,9 +52,10 @@ jobs:
         sed -i '1i ccflags-y += -w' drivers/net/can/spi/Makefile
         sed -i '1i ccflags-y += -w' drivers/clk/Makefile
         sed -i '1i ccflags-y += -w' drivers/kernelsu/Makefile
-        
-        # NEW FIX: Silence cpufreq_bouncing
         sed -i '1i ccflags-y += -w' drivers/oneplus/coretech/cpufreq_bouncing/Makefile
+        
+        # NEW FIX: Silence Houston Driver
+        sed -i '1i ccflags-y += -w' drivers/oneplus/coretech/houston/Makefile
 
         # --- 6. Global Compiler Flags ---
         find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
@@ -65,6 +66,8 @@ jobs:
         echo "KBUILD_CFLAGS += -Wno-memset-elt-size" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-incompatible-pointer-types" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-format" >> Makefile
+        # NEW GLOBAL FIX: Ignore unused results
+        echo "KBUILD_CFLAGS += -Wno-unused-result" >> Makefile
 
         # --- 7. KernelSU Source Fixes ---
         
