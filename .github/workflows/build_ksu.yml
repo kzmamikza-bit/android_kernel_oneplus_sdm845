@@ -30,22 +30,8 @@ jobs:
         sed -i '/bprm = kzalloc/i \\tif (ksu_handle_execveat(&fd, (void *)&filename, (void *)&argv, (void *)&envp, &flags)) return 0;' fs/exec.c
         sed -i '/struct filename \*tmp;/a extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n\tif (ksu_handle_faccessat(&dfd, &filename, (int *)&mode, NULL)) return 0;' fs/open.c
 
-        # 3. FIX: TWA_RESUME Definition (New Strategy)
-        # Create a header file with the missing definition
-        echo "#ifndef TWA_RESUME" > ksu_compat_fix.h
-        echo "#define TWA_RESUME 1" >> ksu_compat_fix.h
-        echo "#endif" >> ksu_compat_fix.h
-        
-        # Prepend this header to the problematic files
-        cat ksu_compat_fix.h drivers/kernelsu/allowlist.c > drivers/kernelsu/allowlist.temp && mv drivers/kernelsu/allowlist.temp drivers/kernelsu/allowlist.c
-        cat ksu_compat_fix.h drivers/kernelsu/kernel_umount.c > drivers/kernelsu/kernel_umount.temp && mv drivers/kernelsu/kernel_umount.temp drivers/kernelsu/kernel_umount.c
-        cat ksu_compat_fix.h drivers/kernelsu/ksud.c > drivers/kernelsu/ksud.temp && mv drivers/kernelsu/ksud.temp drivers/kernelsu/ksud.c
-        cat ksu_compat_fix.h drivers/kernelsu/supercalls.c > drivers/kernelsu/supercalls.temp && mv drivers/kernelsu/supercalls.temp drivers/kernelsu/supercalls.c
-
-        # 4. FIX: Drivers & Warnings (SAFE INSERTION MODE)
+        # 3. FIX: Drivers & Warnings (SAFE INSERTION MODE)
         sed -i '1i #include <linux/stacktrace.h>' drivers/oneplus/drivers/oem_trace/oem_trace.c
-        
-        # Force silence warnings
         sed -i '1i ccflags-y += -w' drivers/oneplus/drivers/oem_trace/Makefile
         sed -i '1i ccflags-y += -w' drivers/oneplus/drivers/param_read_write/Makefile
         sed -i '1i ccflags-y += -w' drivers/input/touchscreen/Makefile
@@ -54,7 +40,7 @@ jobs:
         sed -i '1i ccflags-y += -w' drivers/clk/Makefile
         sed -i '1i ccflags-y += -w' drivers/kernelsu/Makefile
 
-        # 5. Global Compiler Flags
+        # 4. Global Compiler Flags
         find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
         sed -i 's/-implicit-function-declaration/-Wimplicit-function-declaration/g' Makefile
         echo "KBUILD_CFLAGS += -Wno-error" >> Makefile
@@ -62,16 +48,20 @@ jobs:
         echo "KBUILD_CFLAGS += -Wno-misleading-indentation" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-memset-elt-size" >> Makefile
 
-        # 6. Kernel 4.9 Compatibility Headers
+        # 5. Kernel 4.9 Compatibility Headers
         echo '#include <linux/compiler.h>' > include/linux/compiler_types.h
         mkdir -p include/linux/sched
         echo -e "#include <linux/sched.h>\n#include <linux/signal.h>" > include/linux/sched/signal.h
         echo '#include <asm/pgtable.h>' > include/linux/pgtable.h
 
-        # 7. KernelSU Source Fixes
+        # 6. KernelSU Source Fixes
+        
+        # G. Fix filter_count (THE NEW FIX)
+        sed -i '/filter_count/d' drivers/kernelsu/app_profile.c
+        
         sed -i 's/force_sig(SIGKILL)/force_sig(SIGKILL, current)/g' drivers/kernelsu/setuid_hook.c
         
-        # Re-build file_wrapper.c
+        # File Wrapper Fix
         rm -f drivers/kernelsu/file_wrapper.c
         cat > drivers/kernelsu/file_wrapper.c <<EOF
         #include <linux/fs.h>
@@ -90,7 +80,7 @@ jobs:
         }
         EOF
 
-        # Re-build util.c with correct header order
+        # Util.c Fix
         cat > drivers/kernelsu/ksu_fix_header.h <<EOF
         #include <linux/sched.h>
         #include <linux/mm.h>
@@ -101,11 +91,21 @@ jobs:
         cat drivers/kernelsu/ksu_fix_header.h drivers/kernelsu/util.c > drivers/kernelsu/util.temp
         mv drivers/kernelsu/util.temp drivers/kernelsu/util.c
 
-        # Fix SELinux Enforcing Variable
+        # TWA_RESUME Fix (For Allowlist)
+        echo "#ifndef TWA_RESUME" > ksu_twa_fix.h
+        echo "#define TWA_RESUME 1" >> ksu_twa_fix.h
+        echo "#endif" >> ksu_twa_fix.h
+        
+        cat ksu_twa_fix.h drivers/kernelsu/allowlist.c > drivers/kernelsu/allowlist.temp && mv drivers/kernelsu/allowlist.temp drivers/kernelsu/allowlist.c
+        cat ksu_twa_fix.h drivers/kernelsu/kernel_umount.c > drivers/kernelsu/kernel_umount.temp && mv drivers/kernelsu/kernel_umount.temp drivers/kernelsu/kernel_umount.c
+        cat ksu_twa_fix.h drivers/kernelsu/ksud.c > drivers/kernelsu/ksud.temp && mv drivers/kernelsu/ksud.temp drivers/kernelsu/ksud.c
+        cat ksu_twa_fix.h drivers/kernelsu/supercalls.c > drivers/kernelsu/supercalls.temp && mv drivers/kernelsu/supercalls.temp drivers/kernelsu/supercalls.c
+
+
+        # SELinux Fixes
         sed -i '1i extern int selinux_enforcing;' drivers/kernelsu/selinux/selinux.c
         sed -i 's/selinux_state.enforcing/selinux_enforcing/g' drivers/kernelsu/selinux/selinux.c
         
-        # Stub sepolicy.c
         rm -f drivers/kernelsu/selinux/sepolicy.c
         cat > drivers/kernelsu/selinux/sepolicy.c <<EOF
         #include <linux/types.h>
@@ -114,14 +114,13 @@ jobs:
         void ksu_restore_sepolicy(void) {}
         EOF
 
-        # Stub rules.c
         rm -f drivers/kernelsu/selinux/rules.c
         cat > drivers/kernelsu/selinux/rules.c <<EOF
         #include <linux/types.h>
         void ksu_suppress_selinux(void) {}
         EOF
 
-        # 8. LINKER FIXES
+        # 7. LINKER FIXES
         find drivers -name "oem_force_dump.c" -exec sh -c 'echo "// Nuked by GitHub Actions" > {}' \;
         cat >> init/main.c <<EOF
         void rpmhstats_statistics(void) {}
@@ -131,7 +130,7 @@ jobs:
         void msm_serial_oem_init(void) {}
         EOF
 
-        # 9. DTC Fix
+        # 8. DTC Fix
         MTP_FILE=$(find arch/arm64/boot/dts/qcom -name "*sdm845-mtp.dts*" | head -n 1)
         if [ -n "$MTP_FILE" ]; then
             find arch/arm64/boot/dts/qcom -name "*cdp*.dts*" -exec cp "$MTP_FILE" {} \;
@@ -156,6 +155,7 @@ jobs:
         echo "CONFIG_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_KPROBE_EVENTS=y" >> arch/arm64/configs/enchilada_defconfig
+        
         echo "# CONFIG_CC_STACKPROTECTOR_STRONG is not set" >> arch/arm64/configs/enchilada_defconfig
         echo "CONFIG_CC_STACKPROTECTOR_NONE=y" >> arch/arm64/configs/enchilada_defconfig
         
