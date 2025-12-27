@@ -41,8 +41,10 @@ jobs:
         sed -i '/bprm = kzalloc/i \\tif (ksu_handle_execveat(&fd, (void *)&filename, (void *)&argv, (void *)&envp, &flags)) return 0;' fs/exec.c
         sed -i '/struct filename \*tmp;/a extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n\tif (ksu_handle_faccessat(&dfd, &filename, (int *)&mode, NULL)) return 0;' fs/open.c
 
-        # --- 5. FIX: OnePlus Drivers & Warnings ---
+        # --- 5. FIX: OnePlus Drivers & Warnings (SAFE MODE) ---
         sed -i '1i #include <linux/stacktrace.h>' drivers/oneplus/drivers/oem_trace/oem_trace.c
+        
+        # Silence Specific Makefiles (Prepend to avoid corruption)
         sed -i '1i ccflags-y += -w' drivers/oneplus/drivers/oem_trace/Makefile
         sed -i '1i ccflags-y += -w' drivers/oneplus/drivers/param_read_write/Makefile
         sed -i '1i ccflags-y += -w' drivers/input/touchscreen/Makefile
@@ -50,6 +52,9 @@ jobs:
         sed -i '1i ccflags-y += -w' drivers/net/can/spi/Makefile
         sed -i '1i ccflags-y += -w' drivers/clk/Makefile
         sed -i '1i ccflags-y += -w' drivers/kernelsu/Makefile
+        
+        # NEW FIX: Silence cpufreq_bouncing
+        sed -i '1i ccflags-y += -w' drivers/oneplus/coretech/cpufreq_bouncing/Makefile
 
         # --- 6. Global Compiler Flags ---
         find . -name "Makefile" -type f -exec sed -i 's/-Werror//g' {} +
@@ -59,6 +64,7 @@ jobs:
         echo "KBUILD_CFLAGS += -Wno-misleading-indentation" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-memset-elt-size" >> Makefile
         echo "KBUILD_CFLAGS += -Wno-incompatible-pointer-types" >> Makefile
+        echo "KBUILD_CFLAGS += -Wno-format" >> Makefile
 
         # --- 7. KernelSU Source Fixes ---
         
@@ -68,7 +74,7 @@ jobs:
         # B. Fix setuid_hook
         sed -i 's/force_sig(SIGKILL)/force_sig(SIGKILL, current)/g' drivers/kernelsu/setuid_hook.c
 
-        # C. FIX: seccomp_cache.c (Refcount to Atomic Translation) - NEW!
+        # C. FIX: seccomp_cache.c (Refcount to Atomic Translation)
         sed -i '1i #define SECCOMP_ARCH_NATIVE_NR 1' drivers/kernelsu/seccomp_cache.c
         sed -i 's/refcount_t/atomic_t/g' drivers/kernelsu/seccomp_cache.c
         sed -i 's/refcount_set/atomic_set/g' drivers/kernelsu/seccomp_cache.c
